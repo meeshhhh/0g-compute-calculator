@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import './App.css'
 
 // Pricing metadata
@@ -157,9 +157,16 @@ function App() {
   const initialState = getInitialState()
   const [selectedGPU, setSelectedGPU] = useState(initialState.gpu)
   const [hours, setHours] = useState(initialState.hours)
+  const isInitialMount = useRef(true)
 
-  // Update URL params when state changes
+  // Update URL params when state changes (skip initial mount)
   useEffect(() => {
+    // Skip on initial mount to keep URL clean
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+
     const params = new URLSearchParams()
     params.set('gpu', selectedGPU)
     params.set('hours', hours)
