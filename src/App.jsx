@@ -1,5 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import './App.css'
+
+// Pricing metadata
+const PRICING_METADATA = {
+  lastUpdated: '2026-02-10',
+  note: 'Pricing is manually curated from provider websites. For dynamic pricing via APIs, see DYNAMIC_PRICING_GUIDE.md',
+}
 
 // Real-world GPU pricing data from various providers (USD per hour)
 const PROVIDERS = {
@@ -128,10 +134,6 @@ const PROVIDERS = {
 }
 
 function App() {
-  const [selectedGPU, setSelectedGPU] = useState('H100 80GB')
-  const [hours, setHours] = useState('100')
-  const [showSpot, setShowSpot] = useState(true)
-
   // Get all unique GPU models across all providers
   const allGPUs = useMemo(() => {
     const gpuSet = new Set()
@@ -140,6 +142,36 @@ function App() {
     })
     return Array.from(gpuSet).sort()
   }, [])
+
+  // Initialize state from URL params or defaults
+  const getInitialState = () => {
+    const params = new URLSearchParams(window.location.search)
+    const gpu = params.get('gpu')
+    const hours = params.get('hours')
+    const spot = params.get('spot')
+
+    return {
+      gpu: gpu && allGPUs.includes(gpu) ? gpu : 'H100 80GB',
+      hours: hours || '100',
+      spot: spot === 'false' ? false : true, // default to true
+    }
+  }
+
+  const initialState = getInitialState()
+  const [selectedGPU, setSelectedGPU] = useState(initialState.gpu)
+  const [hours, setHours] = useState(initialState.hours)
+  const [showSpot, setShowSpot] = useState(initialState.spot)
+
+  // Update URL params when state changes
+  useEffect(() => {
+    const params = new URLSearchParams()
+    params.set('gpu', selectedGPU)
+    params.set('hours', hours)
+    params.set('spot', showSpot.toString())
+
+    const newUrl = `${window.location.pathname}?${params.toString()}`
+    window.history.replaceState({}, '', newUrl)
+  }, [selectedGPU, hours, showSpot])
 
   // Get providers that offer the selected GPU with pricing
   const availableProviders = useMemo(() => {
@@ -352,9 +384,29 @@ function App() {
         )}
 
         {/* Footer */}
-        <div className="mt-8 text-center">
+        <div className="mt-8 text-center space-y-2">
           <p className="text-xs text-gray-500">
-            Pricing data from 2026 research. Rates may vary based on availability and region.
+            Pricing data manually updated as of <span className="font-medium text-gray-400">{PRICING_METADATA.lastUpdated}</span>.
+            Rates may vary based on availability and region.
+          </p>
+          <p className="text-xs">
+            <a
+              href="https://github.com/meeshhhh/0g-compute-calculator/issues/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline"
+            >
+              Report outdated pricing
+            </a>
+            {' • '}
+            <a
+              href="https://github.com/meeshhhh/0g-compute-calculator/blob/main/DYNAMIC_PRICING_GUIDE.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline"
+            >
+              Dynamic pricing guide
+            </a>
           </p>
         </div>
       </div>
