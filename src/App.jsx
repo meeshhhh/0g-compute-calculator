@@ -4,7 +4,6 @@ import './App.css'
 // Pricing metadata
 const PRICING_METADATA = {
   lastUpdated: '2026-02-10',
-  note: 'Pricing is manually curated from provider websites. For dynamic pricing via APIs, see DYNAMIC_PRICING_GUIDE.md',
 }
 
 // Real-world GPU pricing data from various providers (USD per hour)
@@ -397,15 +396,6 @@ function App() {
               className="text-blue-400 hover:text-blue-300 underline"
             >
               Report outdated pricing
-            </a>
-            {' • '}
-            <a
-              href="https://github.com/meeshhhh/0g-compute-calculator/blob/main/DYNAMIC_PRICING_GUIDE.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 underline"
-            >
-              Dynamic pricing guide
             </a>
           </p>
         </div>

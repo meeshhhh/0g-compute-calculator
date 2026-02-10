@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: GPU compute pricing calculator\n\nSet up React + Vite project with Tailwind CSS and implemented a GPU compute pricing calculator with support for A100, H100, and RTX 4090 models. Features include real-time cost calculation, clean dark theme UI, and hardcoded hourly rates.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(npm install:*)",
+      "WebSearch",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(vercel --version:*)",
+      "Bash(vercel:*)"
+    ]
+  }
+}
