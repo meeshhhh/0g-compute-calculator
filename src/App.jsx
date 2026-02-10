@@ -147,30 +147,26 @@ function App() {
     const params = new URLSearchParams(window.location.search)
     const gpu = params.get('gpu')
     const hours = params.get('hours')
-    const spot = params.get('spot')
 
     return {
       gpu: gpu && allGPUs.includes(gpu) ? gpu : 'H100 80GB',
       hours: hours || '100',
-      spot: spot === 'false' ? false : true, // default to true
     }
   }
 
   const initialState = getInitialState()
   const [selectedGPU, setSelectedGPU] = useState(initialState.gpu)
   const [hours, setHours] = useState(initialState.hours)
-  const [showSpot, setShowSpot] = useState(initialState.spot)
 
   // Update URL params when state changes
   useEffect(() => {
     const params = new URLSearchParams()
     params.set('gpu', selectedGPU)
     params.set('hours', hours)
-    params.set('spot', showSpot.toString())
 
     const newUrl = `${window.location.pathname}?${params.toString()}`
     window.history.replaceState({}, '', newUrl)
-  }, [selectedGPU, hours, showSpot])
+  }, [selectedGPU, hours])
 
   // Get providers that offer the selected GPU with pricing
   const availableProviders = useMemo(() => {
@@ -192,16 +188,13 @@ function App() {
       }
     })
 
-    // Sort by cheapest total cost (considering spot if enabled and available)
+    // Sort by cheapest available price (use spot if available, otherwise on-demand)
     return providers.sort((a, b) => {
-      const aCost = showSpot && a.spotTotal !== null ? a.spotTotal : a.onDemandTotal
-      const bCost = showSpot && b.spotTotal !== null ? b.spotTotal : b.onDemandTotal
+      const aCost = a.spotTotal !== null ? a.spotTotal : a.onDemandTotal
+      const bCost = b.spotTotal !== null ? b.spotTotal : b.onDemandTotal
       return aCost - bCost
     })
-  }, [selectedGPU, hours, showSpot])
-
-  // Count providers with spot pricing
-  const spotProvidersCount = availableProviders.filter(p => p.spotRate !== null).length
+  }, [selectedGPU, hours])
 
   const typeColors = {
     'Decentralized': 'bg-purple-900/30 text-purple-300 border-purple-700',
@@ -224,7 +217,7 @@ function App() {
 
         {/* Selection Panel */}
         <div className="bg-gray-800 rounded-lg shadow-2xl p-6 border border-gray-700 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* GPU Selector */}
             <div>
               <label htmlFor="gpu-select" className="block text-sm font-medium text-gray-300 mb-2">
@@ -260,52 +253,18 @@ function App() {
                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-
-            {/* Show Spot Toggle */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Pricing Preference
-              </label>
-              <button
-                onClick={() => setShowSpot(!showSpot)}
-                className={`w-full px-4 py-3 rounded-lg font-medium transition-all ${
-                  showSpot
-                    ? 'bg-purple-600 text-white shadow-lg'
-                    : 'bg-gray-700 text-gray-300'
-                }`}
-              >
-                <div>{showSpot ? '⚡ Prefer Spot Pricing' : '🔒 On-Demand Pricing'}</div>
-                {spotProvidersCount > 0 && (
-                  <div className="text-xs opacity-90 mt-1">
-                    {spotProvidersCount} provider{spotProvidersCount !== 1 ? 's' : ''} with spot available
-                  </div>
-                )}
-              </button>
-              {spotProvidersCount === 0 && (
-                <p className="text-xs text-gray-500 mt-2">
-                  No spot pricing available for this GPU
-                </p>
-              )}
-            </div>
           </div>
 
           {/* Results Summary */}
           <div className="mt-6 pt-6 border-t border-gray-700">
-            <div className="text-center space-y-1">
+            <div className="text-center">
               <p className="text-gray-400 text-sm">
                 Found {availableProviders.length} provider{availableProviders.length !== 1 ? 's' : ''} offering <span className="text-blue-400 font-medium">{selectedGPU}</span>
               </p>
               {availableProviders.length > 0 && (
-                <>
-                  <p className="text-gray-500 text-xs">
-                    Price range: ${Math.min(...availableProviders.map(p => showSpot && p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)} - ${Math.max(...availableProviders.map(p => showSpot && p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)}
-                  </p>
-                  {showSpot && spotProvidersCount > 0 && (
-                    <p className="text-purple-400 text-xs">
-                      ⚡ Showing spot pricing for {spotProvidersCount} provider{spotProvidersCount !== 1 ? 's' : ''}
-                    </p>
-                  )}
-                </>
+                <p className="text-gray-500 text-xs mt-1">
+                  Price range: ${Math.min(...availableProviders.map(p => p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)} - ${Math.max(...availableProviders.map(p => p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)}
+                </p>
               )}
             </div>
           </div>
@@ -315,12 +274,9 @@ function App() {
         {availableProviders.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {availableProviders.map((provider, index) => {
-              const showingSpot = showSpot && provider.spotTotal !== null
-              const displayRate = showingSpot ? provider.spotRate : provider.onDemandRate
-              const displayTotal = showingSpot ? provider.spotTotal : provider.onDemandTotal
-              const savings = provider.spotTotal && showingSpot
-                ? provider.onDemandTotal - provider.spotTotal
-                : 0
+              const hasSpot = provider.spotRate !== null
+              const bestPrice = hasSpot ? provider.spotTotal : provider.onDemandTotal
+              const savings = hasSpot ? provider.onDemandTotal - provider.spotTotal : 0
 
               return (
                 <div
@@ -352,25 +308,21 @@ function App() {
 
                   {/* Pricing */}
                   <div className="space-y-2 mb-4">
+                    {/* On-Demand Pricing */}
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">Hourly Rate:</span>
+                      <span className="text-sm text-gray-400">On-Demand:</span>
                       <span className="text-gray-200 font-medium">
-                        ${displayRate.toFixed(2)}/hr
+                        ${provider.onDemandRate.toFixed(2)}/hr
                       </span>
                     </div>
 
-                    {showingSpot && (
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-purple-400">⚡ Spot Pricing</span>
-                        <span className="text-purple-300">
-                          Save ${savings.toFixed(2)}
+                    {/* Spot Pricing if available */}
+                    {hasSpot && (
+                      <div className="flex justify-between items-center bg-purple-900/20 -mx-2 px-2 py-1 rounded">
+                        <span className="text-sm text-purple-300">⚡ Spot:</span>
+                        <span className="text-purple-200 font-medium">
+                          ${provider.spotRate.toFixed(2)}/hr
                         </span>
-                      </div>
-                    )}
-
-                    {!showingSpot && provider.spotTotal !== null && (
-                      <div className="text-xs text-gray-500">
-                        Spot available: ${provider.spotRate.toFixed(2)}/hr
                       </div>
                     )}
                   </div>
@@ -378,14 +330,21 @@ function App() {
                   {/* Total Cost */}
                   <div className="pt-4 border-t border-gray-700">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">Total Cost:</span>
+                      <span className="text-sm text-gray-400">{hasSpot ? 'Best Price:' : 'Total Cost:'}</span>
                       <span className="text-2xl font-bold text-green-400">
-                        ${displayTotal.toFixed(2)}
+                        ${bestPrice.toFixed(2)}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 text-right mt-1">
-                      for {hours} hours
-                    </p>
+                    <div className="text-xs text-right mt-1 space-y-0.5">
+                      <p className="text-gray-500">
+                        for {hours} hours
+                      </p>
+                      {hasSpot && (
+                        <p className="text-purple-400">
+                          Save ${savings.toFixed(2)} with spot ({Math.round((savings / provider.onDemandTotal) * 100)}% off)
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
