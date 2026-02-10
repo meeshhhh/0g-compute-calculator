@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import './App.css'
 
 // Real-world GPU pricing data from various providers (USD per hour)
@@ -128,179 +128,232 @@ const PROVIDERS = {
 }
 
 function App() {
-  const [selectedProvider, setSelectedProvider] = useState('Akash Network')
   const [selectedGPU, setSelectedGPU] = useState('H100 80GB')
-  const [hours, setHours] = useState('')
-  const [isSpot, setIsSpot] = useState(false)
+  const [hours, setHours] = useState('100')
+  const [showSpot, setShowSpot] = useState(true)
 
-  const currentProvider = PROVIDERS[selectedProvider]
-  const availableGPUs = Object.keys(currentProvider.gpus)
+  // Get all unique GPU models across all providers
+  const allGPUs = useMemo(() => {
+    const gpuSet = new Set()
+    Object.values(PROVIDERS).forEach(provider => {
+      Object.keys(provider.gpus).forEach(gpu => gpuSet.add(gpu))
+    })
+    return Array.from(gpuSet).sort()
+  }, [])
 
-  // Reset GPU selection if not available in new provider
-  const handleProviderChange = (provider) => {
-    setSelectedProvider(provider)
-    const newProviderGPUs = Object.keys(PROVIDERS[provider].gpus)
-    if (!newProviderGPUs.includes(selectedGPU)) {
-      setSelectedGPU(newProviderGPUs[0])
-    }
-    // Reset spot if not available
-    if (isSpot && !PROVIDERS[provider].gpus[newProviderGPUs[0]]?.spot) {
-      setIsSpot(false)
-    }
+  // Get providers that offer the selected GPU with pricing
+  const availableProviders = useMemo(() => {
+    const providers = []
+
+    Object.entries(PROVIDERS).forEach(([name, data]) => {
+      if (data.gpus[selectedGPU]) {
+        const pricing = data.gpus[selectedGPU]
+        const numHours = parseFloat(hours) || 0
+
+        providers.push({
+          name,
+          type: data.type,
+          onDemandRate: pricing.onDemand,
+          spotRate: pricing.spot,
+          onDemandTotal: pricing.onDemand * numHours,
+          spotTotal: pricing.spot ? pricing.spot * numHours : null,
+        })
+      }
+    })
+
+    // Sort by cheapest total cost (considering spot if enabled and available)
+    return providers.sort((a, b) => {
+      const aCost = showSpot && a.spotTotal !== null ? a.spotTotal : a.onDemandTotal
+      const bCost = showSpot && b.spotTotal !== null ? b.spotTotal : b.onDemandTotal
+      return aCost - bCost
+    })
+  }, [selectedGPU, hours, showSpot])
+
+  const typeColors = {
+    'Decentralized': 'bg-purple-900/30 text-purple-300 border-purple-700',
+    'Marketplace': 'bg-blue-900/30 text-blue-300 border-blue-700',
+    'Cloud': 'bg-gray-700/30 text-gray-300 border-gray-600',
   }
-
-  const getHourlyRate = () => {
-    const gpuPricing = currentProvider.gpus[selectedGPU]
-    if (isSpot && gpuPricing.spot) {
-      return gpuPricing.spot
-    }
-    return gpuPricing.onDemand
-  }
-
-  const calculateCost = () => {
-    const numHours = parseFloat(hours)
-    if (isNaN(numHours) || numHours < 0) return 0
-    return (getHourlyRate() * numHours).toFixed(2)
-  }
-
-  const hasSpotPricing = currentProvider.gpus[selectedGPU]?.spot !== null
-  const estimatedCost = calculateCost()
-  const currentRate = getHourlyRate().toFixed(2)
-  const onDemandRate = currentProvider.gpus[selectedGPU].onDemand
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-gray-800 rounded-lg shadow-2xl p-8 border border-gray-700">
-        <h1 className="text-3xl font-bold text-center mb-2 text-gray-100">
-          GPU Compute Calculator
-        </h1>
-        <p className="text-center text-sm text-gray-400 mb-8">
-          Compare real-world pricing across providers
-        </p>
+    <div className="min-h-screen bg-gray-900 py-8 px-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-100 mb-2">
+            GPU Compute Price Comparison
+          </h1>
+          <p className="text-gray-400">
+            Compare real-world pricing across 13 providers
+          </p>
+        </div>
 
-        <div className="space-y-6">
-          {/* Provider Dropdown */}
-          <div>
-            <label htmlFor="provider-select" className="block text-sm font-medium text-gray-300 mb-2">
-              Provider
-            </label>
-            <select
-              id="provider-select"
-              value={selectedProvider}
-              onChange={(e) => handleProviderChange(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {Object.entries(PROVIDERS).map(([provider, data]) => (
-                <option key={provider} value={provider}>
-                  {provider} ({data.type})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* GPU Model Dropdown */}
-          <div>
-            <label htmlFor="gpu-select" className="block text-sm font-medium text-gray-300 mb-2">
-              GPU Model
-            </label>
-            <select
-              id="gpu-select"
-              value={selectedGPU}
-              onChange={(e) => {
-                setSelectedGPU(e.target.value)
-                // Reset spot if not available for this GPU
-                if (isSpot && !currentProvider.gpus[e.target.value]?.spot) {
-                  setIsSpot(false)
-                }
-              }}
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {availableGPUs.map((gpu) => (
-                <option key={gpu} value={gpu}>
-                  {gpu} - ${currentProvider.gpus[gpu].onDemand}/hr
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Pricing Type Toggle */}
-          {hasSpotPricing && (
+        {/* Selection Panel */}
+        <div className="bg-gray-800 rounded-lg shadow-2xl p-6 border border-gray-700 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* GPU Selector */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-3">
-                Pricing Type
+              <label htmlFor="gpu-select" className="block text-sm font-medium text-gray-300 mb-2">
+                GPU Model
               </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setIsSpot(false)}
-                  className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-                    !isSpot
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  On-Demand
-                </button>
-                <button
-                  onClick={() => setIsSpot(true)}
-                  className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-                    isSpot
-                      ? 'bg-purple-600 text-white shadow-lg'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  <div>Spot</div>
-                  <div className="text-xs opacity-90">
-                    {Math.round((1 - currentProvider.gpus[selectedGPU].spot / onDemandRate) * 100)}% off
-                  </div>
-                </button>
-              </div>
+              <select
+                id="gpu-select"
+                value={selectedGPU}
+                onChange={(e) => setSelectedGPU(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {allGPUs.map((gpu) => (
+                  <option key={gpu} value={gpu}>
+                    {gpu}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
 
-          {/* Hours Input */}
-          <div>
-            <label htmlFor="hours-input" className="block text-sm font-medium text-gray-300 mb-2">
-              Number of Hours
-            </label>
-            <input
-              id="hours-input"
-              type="number"
-              min="0"
-              step="0.1"
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              placeholder="Enter hours"
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            {/* Hours Input */}
+            <div>
+              <label htmlFor="hours-input" className="block text-sm font-medium text-gray-300 mb-2">
+                Number of Hours
+              </label>
+              <input
+                id="hours-input"
+                type="number"
+                min="0"
+                step="1"
+                value={hours}
+                onChange={(e) => setHours(e.target.value)}
+                placeholder="Enter hours"
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Show Spot Toggle */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Pricing Preference
+              </label>
+              <button
+                onClick={() => setShowSpot(!showSpot)}
+                className={`w-full px-4 py-3 rounded-lg font-medium transition-all ${
+                  showSpot
+                    ? 'bg-purple-600 text-white shadow-lg'
+                    : 'bg-gray-700 text-gray-300'
+                }`}
+              >
+                {showSpot ? '⚡ Prefer Spot (when available)' : '🔒 On-Demand Only'}
+              </button>
+            </div>
           </div>
 
-          {/* Cost Display */}
-          <div className="pt-4 border-t border-gray-600">
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-medium text-gray-300">Estimated Cost:</span>
-              <span className="text-3xl font-bold text-green-400">
-                ${estimatedCost}
-              </span>
-            </div>
-            {hours && (
-              <div className="mt-2 text-right space-y-1">
-                <p className="text-sm text-gray-400">
-                  {hours} hours × ${currentRate}/hr
+          {/* Results Summary */}
+          <div className="mt-6 pt-6 border-t border-gray-700">
+            <div className="text-center">
+              <p className="text-gray-400 text-sm mb-1">
+                Found {availableProviders.length} provider{availableProviders.length !== 1 ? 's' : ''} offering <span className="text-blue-400 font-medium">{selectedGPU}</span>
+              </p>
+              {availableProviders.length > 0 && (
+                <p className="text-gray-500 text-xs">
+                  Price range: ${Math.min(...availableProviders.map(p => showSpot && p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)} - ${Math.max(...availableProviders.map(p => showSpot && p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)}
                 </p>
-                {isSpot && hasSpotPricing && (
-                  <p className="text-xs text-purple-400">
-                    Spot pricing - Save ${(onDemandRate * parseFloat(hours) - estimatedCost).toFixed(2)} (
-                    {Math.round((1 - currentProvider.gpus[selectedGPU].spot / onDemandRate) * 100)}% off)
-                  </p>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Info Footer */}
-        <div className="mt-8 pt-6 border-t border-gray-700">
-          <p className="text-xs text-gray-500 text-center">
+        {/* Provider Cards */}
+        {availableProviders.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {availableProviders.map((provider, index) => {
+              const showingSpot = showSpot && provider.spotTotal !== null
+              const displayRate = showingSpot ? provider.spotRate : provider.onDemandRate
+              const displayTotal = showingSpot ? provider.spotTotal : provider.onDemandTotal
+              const savings = provider.spotTotal && showingSpot
+                ? provider.onDemandTotal - provider.spotTotal
+                : 0
+
+              return (
+                <div
+                  key={provider.name}
+                  className="bg-gray-800 rounded-lg p-5 border border-gray-700 hover:border-gray-600 transition-all"
+                >
+                  {/* Rank Badge */}
+                  {index < 3 && (
+                    <div className="flex justify-end mb-2">
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
+                        index === 1 ? 'bg-gray-400/20 text-gray-300' :
+                        'bg-amber-600/20 text-amber-400'
+                      }`}>
+                        {index === 0 ? '🥇 Best Price' : index === 1 ? '🥈 2nd Best' : '🥉 3rd Best'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Provider Name & Type */}
+                  <div className="mb-3">
+                    <h3 className="text-lg font-bold text-gray-100 mb-1">
+                      {provider.name}
+                    </h3>
+                    <span className={`text-xs px-2 py-1 rounded border ${typeColors[provider.type]}`}>
+                      {provider.type}
+                    </span>
+                  </div>
+
+                  {/* Pricing */}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-400">Hourly Rate:</span>
+                      <span className="text-gray-200 font-medium">
+                        ${displayRate.toFixed(2)}/hr
+                      </span>
+                    </div>
+
+                    {showingSpot && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-purple-400">⚡ Spot Pricing</span>
+                        <span className="text-purple-300">
+                          Save ${savings.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+
+                    {!showingSpot && provider.spotTotal !== null && (
+                      <div className="text-xs text-gray-500">
+                        Spot available: ${provider.spotRate.toFixed(2)}/hr
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Total Cost */}
+                  <div className="pt-4 border-t border-gray-700">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-400">Total Cost:</span>
+                      <span className="text-2xl font-bold text-green-400">
+                        ${displayTotal.toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 text-right mt-1">
+                      for {hours} hours
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="bg-gray-800 rounded-lg p-12 border border-gray-700 text-center">
+            <p className="text-gray-400 text-lg">
+              No providers found for <span className="text-blue-400 font-medium">{selectedGPU}</span>
+            </p>
+            <p className="text-gray-500 text-sm mt-2">
+              Try selecting a different GPU model
+            </p>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-8 text-center">
+          <p className="text-xs text-gray-500">
             Pricing data from 2026 research. Rates may vary based on availability and region.
           </p>
         </div>
