@@ -200,6 +200,9 @@ function App() {
     })
   }, [selectedGPU, hours, showSpot])
 
+  // Count providers with spot pricing
+  const spotProvidersCount = availableProviders.filter(p => p.spotRate !== null).length
+
   const typeColors = {
     'Decentralized': 'bg-purple-900/30 text-purple-300 border-purple-700',
     'Marketplace': 'bg-blue-900/30 text-blue-300 border-blue-700',
@@ -271,21 +274,38 @@ function App() {
                     : 'bg-gray-700 text-gray-300'
                 }`}
               >
-                {showSpot ? '⚡ Prefer Spot (when available)' : '🔒 On-Demand Only'}
+                <div>{showSpot ? '⚡ Prefer Spot Pricing' : '🔒 On-Demand Pricing'}</div>
+                {spotProvidersCount > 0 && (
+                  <div className="text-xs opacity-90 mt-1">
+                    {spotProvidersCount} provider{spotProvidersCount !== 1 ? 's' : ''} with spot available
+                  </div>
+                )}
               </button>
+              {spotProvidersCount === 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  No spot pricing available for this GPU
+                </p>
+              )}
             </div>
           </div>
 
           {/* Results Summary */}
           <div className="mt-6 pt-6 border-t border-gray-700">
-            <div className="text-center">
-              <p className="text-gray-400 text-sm mb-1">
+            <div className="text-center space-y-1">
+              <p className="text-gray-400 text-sm">
                 Found {availableProviders.length} provider{availableProviders.length !== 1 ? 's' : ''} offering <span className="text-blue-400 font-medium">{selectedGPU}</span>
               </p>
               {availableProviders.length > 0 && (
-                <p className="text-gray-500 text-xs">
-                  Price range: ${Math.min(...availableProviders.map(p => showSpot && p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)} - ${Math.max(...availableProviders.map(p => showSpot && p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)}
-                </p>
+                <>
+                  <p className="text-gray-500 text-xs">
+                    Price range: ${Math.min(...availableProviders.map(p => showSpot && p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)} - ${Math.max(...availableProviders.map(p => showSpot && p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)}
+                  </p>
+                  {showSpot && spotProvidersCount > 0 && (
+                    <p className="text-purple-400 text-xs">
+                      ⚡ Showing spot pricing for {spotProvidersCount} provider{spotProvidersCount !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>
