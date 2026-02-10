@@ -142,21 +142,23 @@ function App() {
     return Array.from(gpuSet).sort()
   }, [])
 
-  // Initialize state from URL params or defaults
+  // Initialize state from URL params or empty
   const getInitialState = () => {
     const params = new URLSearchParams(window.location.search)
     const gpu = params.get('gpu')
     const hours = params.get('hours')
 
     return {
-      gpu: gpu && allGPUs.includes(gpu) ? gpu : 'H100 80GB',
-      hours: hours || '100',
+      gpu: gpu && allGPUs.includes(gpu) ? gpu : '',
+      hours: hours || '',
     }
   }
 
   const initialState = getInitialState()
   const [selectedGPU, setSelectedGPU] = useState(initialState.gpu)
   const [hours, setHours] = useState(initialState.hours)
+
+  const hasSelections = selectedGPU && hours
   const isInitialMount = useRef(true)
 
   // Update URL params when state changes (skip initial mount)
@@ -236,6 +238,7 @@ function App() {
                 onChange={(e) => setSelectedGPU(e.target.value)}
                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
+                <option value="">Select a GPU model...</option>
                 {allGPUs.map((gpu) => (
                   <option key={gpu} value={gpu}>
                     {gpu}
@@ -263,22 +266,36 @@ function App() {
           </div>
 
           {/* Results Summary */}
-          <div className="mt-6 pt-6 border-t border-gray-700">
-            <div className="text-center">
-              <p className="text-gray-400 text-sm">
-                Found {availableProviders.length} provider{availableProviders.length !== 1 ? 's' : ''} offering <span className="text-blue-400 font-medium">{selectedGPU}</span>
-              </p>
-              {availableProviders.length > 0 && (
-                <p className="text-gray-500 text-xs mt-1">
-                  Price range: ${Math.min(...availableProviders.map(p => p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)} - ${Math.max(...availableProviders.map(p => p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)}
+          {!hasSelections ? (
+            <div className="mt-6 pt-6 border-t border-gray-700">
+              <div className="text-center py-8">
+                <div className="text-5xl mb-4">🖥️</div>
+                <h2 className="text-xl font-semibold text-gray-200 mb-2">
+                  Get Started
+                </h2>
+                <p className="text-gray-400 text-sm">
+                  Select a GPU model and enter the number of hours to compare prices across 13 providers
                 </p>
-              )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mt-6 pt-6 border-t border-gray-700">
+              <div className="text-center">
+                <p className="text-gray-400 text-sm">
+                  Found {availableProviders.length} provider{availableProviders.length !== 1 ? 's' : ''} offering <span className="text-blue-400 font-medium">{selectedGPU}</span>
+                </p>
+                {availableProviders.length > 0 && (
+                  <p className="text-gray-500 text-xs mt-1">
+                    Price range: ${Math.min(...availableProviders.map(p => p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)} - ${Math.max(...availableProviders.map(p => p.spotTotal !== null ? p.spotTotal : p.onDemandTotal)).toFixed(2)}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Provider Cards */}
-        {availableProviders.length > 0 ? (
+        {hasSelections && availableProviders.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {availableProviders.map((provider, index) => {
               const hasSpot = provider.spotRate !== null
@@ -357,7 +374,7 @@ function App() {
               )
             })}
           </div>
-        ) : (
+        ) : hasSelections ? (
           <div className="bg-gray-800 rounded-lg p-12 border border-gray-700 text-center">
             <p className="text-gray-400 text-lg">
               No providers found for <span className="text-blue-400 font-medium">{selectedGPU}</span>
@@ -366,7 +383,7 @@ function App() {
               Try selecting a different GPU model
             </p>
           </div>
-        )}
+        ) : null}
 
         {/* Footer */}
         <div className="mt-8 text-center space-y-2">
